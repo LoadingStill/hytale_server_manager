@@ -45,6 +45,19 @@ export class ModService {
   ): Promise<ModWithFiles> {
     logger.info(`Installing mod ${metadata.projectTitle} on server ${serverId}`);
 
+    // Check if this mod is already installed on this server
+    const existingMod = await this.prisma.mod.findFirst({
+      where: {
+        serverId,
+        projectId: metadata.projectId,
+        providerId: metadata.providerId || 'modtale',
+      },
+    });
+
+    if (existingMod) {
+      throw new Error(`Mod "${metadata.projectTitle}" is already installed on this server`);
+    }
+
     // Install via adapter - now returns list of installed files
     const installedFiles = await adapter.installMod(modFile, metadata);
 
