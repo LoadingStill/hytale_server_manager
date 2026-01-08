@@ -21,16 +21,10 @@ export const UpdateSettingsCard = () => {
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Detect platform
-  const isWindows = navigator.platform.toLowerCase().includes('win');
-  const platform = isWindows ? 'windows' : 'linux';
-
   useEffect(() => {
     // Load update info on mount
     checkForUpdates();
   }, [checkForUpdates]);
-
-  const currentScript = updateInfo?.scripts?.[platform];
 
   const handleApplyUpdate = async () => {
     setShowConfirm(false);
