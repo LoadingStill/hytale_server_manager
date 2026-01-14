@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
+import { env } from '../config';
 
-const WS_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const WS_BASE_URL = env.websocket.url || env.api.baseUrl;
 
 class WebSocketService {
   private baseUrl: string;
