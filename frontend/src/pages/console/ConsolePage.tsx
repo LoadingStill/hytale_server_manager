@@ -30,8 +30,14 @@ export const ConsolePage = () => {
   const consoleEndRef = useRef<HTMLDivElement>(null);
   const urlRegex = /https?:\/\/[^\s]+/g;
 
+  const stripAnsiCodes = (message: string) => {
+    // Remove ANSI color/control sequences (e.g. "\x1b[31m", "\x1b[m").
+    return message.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+  };
+
   const formatLogMessage = (message: string) => {
-    return message.replace(urlRegex, (url) => {
+    const cleaned = stripAnsiCodes(message);
+    return cleaned.replace(urlRegex, (url) => {
       try {
         return decodeURIComponent(url);
       } catch {
