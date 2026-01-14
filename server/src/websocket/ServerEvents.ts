@@ -6,7 +6,16 @@ import { ConsoleService } from '../services/ConsoleService';
 import logger from '../utils/logger';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || '';
+
+// Read JWT_SECRET lazily to ensure dotenv has loaded
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    logger.error('JWT_SECRET not configured!');
+    return '';
+  }
+  return secret;
+}
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -42,13 +51,14 @@ export class ServerEvents {
           return next(new Error('Authentication required'));
         }
 
-        if (!JWT_SECRET) {
+        const jwtSecret = getJwtSecret();
+        if (!jwtSecret) {
           logger.error('JWT_SECRET not configured for WebSocket authentication');
           return next(new Error('Server configuration error'));
         }
 
         // Verify the JWT token
-        const payload = jwt.verify(token, JWT_SECRET) as { sub: string; username: string; role: string; type: string };
+        const payload = jwt.verify(token, jwtSecret) as { sub: string; username: string; role: string; type: string };
 
         if (payload.type !== 'access') {
           logger.warn(`WebSocket connection rejected: Invalid token type (${socket.id})`);
