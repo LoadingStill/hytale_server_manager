@@ -37,7 +37,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Astro site
-        run: pnpm --filter website build
+        run: pnpm --filter hytale-server-manager-website build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
