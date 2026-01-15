@@ -150,7 +150,7 @@ function createConfig(): EnvConfig {
   // Determine API base URL based on environment
   // Note: Use localhost for client connections, not 0.0.0.0 (which is only for server binding)
   const defaultApiUrl = isDevelopment
-    ? 'http://localhost:3001'
+    ? window.location.origin
     : window.location.origin;
 
   const config: EnvConfig = {
@@ -166,7 +166,7 @@ function createConfig(): EnvConfig {
     },
 
     websocket: {
-      url: getEnvVar('VITE_WS_URL', defaultApiUrl.replace('http', 'ws')),
+      url: getEnvVar('VITE_WS_URL', window.location.origin.replace('http', 'ws')),
       reconnectAttempts: getEnvNumber('VITE_WS_RECONNECT_ATTEMPTS', 5),
       reconnectDelay: getEnvNumber('VITE_WS_RECONNECT_DELAY', 3000),
     },

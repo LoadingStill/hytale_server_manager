@@ -18,6 +18,7 @@ vi.mock('../../services/auth', () => ({
     getCurrentUser: vi.fn(),
     getAccessToken: vi.fn(),
     getRefreshToken: vi.fn(),
+    getSetupStatus: vi.fn(),
   },
   AuthError: class AuthError extends Error {
     code: string;
@@ -52,6 +53,8 @@ describe('authStore', () => {
       user: null,
       isAuthenticated: false,
       isInitializing: true,
+      setupRequired: null,
+      isSetupLoading: true,
       isLoading: false,
       error: null,
     });
@@ -68,6 +71,8 @@ describe('authStore', () => {
       expect(state.user).toBeNull();
       expect(state.isAuthenticated).toBe(false);
       expect(state.isInitializing).toBe(true);
+      expect(state.setupRequired).toBeNull();
+      expect(state.isSetupLoading).toBe(true);
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
     });
@@ -223,6 +228,7 @@ describe('authStore', () => {
         role: 'admin' as const,
       };
 
+      vi.mocked(authService.getSetupStatus).mockResolvedValueOnce({ setupRequired: false });
       vi.mocked(authService.isSessionValid).mockResolvedValueOnce(true);
       vi.mocked(authService.getCurrentUser).mockResolvedValueOnce(mockUser);
 
@@ -233,9 +239,12 @@ describe('authStore', () => {
       expect(state.isInitializing).toBe(false);
       expect(state.user).toEqual(mockUser);
       expect(state.isAuthenticated).toBe(true);
+      expect(state.setupRequired).toBe(false);
+      expect(state.isSetupLoading).toBe(false);
     });
 
     it('should initialize with no session', async () => {
+      vi.mocked(authService.getSetupStatus).mockResolvedValueOnce({ setupRequired: false });
       vi.mocked(authService.isSessionValid).mockResolvedValueOnce(false);
 
       const { initialize } = useAuthStore.getState();
@@ -245,9 +254,12 @@ describe('authStore', () => {
       expect(state.isInitializing).toBe(false);
       expect(state.user).toBeNull();
       expect(state.isAuthenticated).toBe(false);
+      expect(state.setupRequired).toBe(false);
+      expect(state.isSetupLoading).toBe(false);
     });
 
     it('should handle initialization error', async () => {
+      vi.mocked(authService.getSetupStatus).mockRejectedValueOnce(new Error('Network error'));
       vi.mocked(authService.isSessionValid).mockRejectedValueOnce(new Error('Network error'));
 
       const { initialize } = useAuthStore.getState();
@@ -257,6 +269,22 @@ describe('authStore', () => {
       expect(state.isInitializing).toBe(false);
       expect(state.user).toBeNull();
       expect(state.isAuthenticated).toBe(false);
+      expect(state.setupRequired).toBe(false);
+      expect(state.isSetupLoading).toBe(false);
+    });
+
+    it('should initialize with setup required', async () => {
+      vi.mocked(authService.getSetupStatus).mockResolvedValueOnce({ setupRequired: true });
+
+      const { initialize } = useAuthStore.getState();
+      await initialize();
+
+      const state = useAuthStore.getState();
+      expect(state.isInitializing).toBe(false);
+      expect(state.user).toBeNull();
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.setupRequired).toBe(true);
+      expect(state.isSetupLoading).toBe(false);
     });
   });
 

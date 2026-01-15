@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import logger from '../utils/logger';
 import { ActivityLogService } from '../services/ActivityLogService';
 import { ACTIVITY_ACTIONS, RESOURCE_TYPES } from '../constants/ActivityLogActions';
@@ -46,19 +45,6 @@ const ACCESS_TOKEN_COOKIE = 'access_token';
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
 /**
- * Generate a cryptographically secure random password
- */
-function generateSecurePassword(length: number = 16): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  const randomBytes = crypto.randomBytes(length);
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += charset[randomBytes[i] % charset.length];
-  }
-  return password;
-}
-
-/**
  * Validate password complexity
  * Requirements: 12+ chars, uppercase, lowercase, number, special char
  */
@@ -96,51 +82,95 @@ export function createAuthRoutes(): Router {
   const router = Router();
 
   /**
-   * Ensure default admin exists with secure random password
+   * Check if initial setup is required (no admin exists yet)
    */
-  async function ensureDefaultAdmin(): Promise<void> {
-    try {
-      const existingAdmin = await prisma.user.findFirst({
-        where: { role: 'admin' },
-      });
-
-      if (!existingAdmin) {
-        // Generate a secure random password
-        const randomPassword = generateSecurePassword(16);
-        const passwordHash = await bcrypt.hash(randomPassword, 12);
-
-        await prisma.user.create({
-          data: {
-            email: 'admin@hytalepanel.local',
-            username: 'admin',
-            passwordHash,
-            role: 'admin',
-          },
-        });
-
-        // Log the generated password with high visibility (only on first run)
-        // Using console directly to ensure visibility regardless of log configuration
-        const banner = '\n' +
-          '╔══════════════════════════════════════════════════════════════╗\n' +
-          '║                    FIRST RUN SETUP                           ║\n' +
-          '╠══════════════════════════════════════════════════════════════╣\n' +
-          '║  Default admin account created                               ║\n' +
-          '║                                                              ║\n' +
-          `║  Username: admin                                             ║\n` +
-          `║  Password: ${randomPassword.padEnd(48)}║\n` +
-          '║                                                              ║\n' +
-          '║  IMPORTANT: Save this password and change it immediately!    ║\n' +
-          '╚══════════════════════════════════════════════════════════════╝\n';
-        console.log(banner);
-        logger.info('Default admin account created - see console for credentials');
-      }
-    } catch (error) {
-      logger.error('Failed to ensure default admin:', error);
-    }
+  async function isSetupRequired(): Promise<boolean> {
+    const adminCount = await prisma.user.count({
+      where: { role: 'admin' },
+    });
+    return adminCount === 0;
   }
 
-  // Ensure default admin exists on startup
-  ensureDefaultAdmin();
+  /**
+   * GET /api/auth/setup
+   * Check if initial admin setup is required
+   */
+  router.get('/setup', async (_req: Request, res: Response) => {
+    try {
+      const setupRequired = await isSetupRequired();
+      return res.json({ setupRequired });
+    } catch (error) {
+      logger.error('Setup status error:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  /**
+   * POST /api/auth/setup
+   * Create the initial admin account (only allowed when no admin exists)
+   */
+  router.post('/setup', strictLimiter, async (req: Request, res: Response) => {
+    try {
+      const setupRequired = await isSetupRequired();
+
+      if (!setupRequired) {
+        return res.status(409).json({ message: 'Initial setup already completed' });
+      }
+
+      const { email, username, password } = req.body;
+
+      if (!email || !username || !password) {
+        return res.status(400).json({ message: 'Email, username, and password are required' });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: 'Invalid email format' });
+      }
+
+      if (username.length < 3 || username.length > 32) {
+        return res.status(400).json({ message: 'Username must be between 3 and 32 characters' });
+      }
+
+      const passwordValidation = validatePasswordComplexity(password);
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ message: passwordValidation.message });
+      }
+
+      const normalizedEmail = email.toLowerCase();
+      const normalizedUsername = username.toLowerCase();
+
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: normalizedEmail },
+            { username: normalizedUsername },
+          ],
+        },
+      });
+
+      if (existingUser) {
+        return res.status(409).json({ message: 'Email or username already in use' });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      await prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          username: normalizedUsername,
+          passwordHash,
+          role: 'admin',
+        },
+      });
+
+      logger.info(`Initial admin account created: ${normalizedUsername}`);
+      return res.status(201).json({ message: 'Admin account created' });
+    } catch (error) {
+      logger.error('Initial setup error:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
 
   /**
    * Generate access token
@@ -209,6 +239,13 @@ export function createAuthRoutes(): Router {
    */
   router.post('/login', strictLimiter, async (req: Request, res: Response) => {
     try {
+      const setupRequired = await isSetupRequired();
+      if (setupRequired) {
+        return res.status(409).json({
+          message: 'Initial setup required. Create an admin account first.',
+        });
+      }
+
       const { identifier, password, rememberMe } = req.body;
 
       if (!identifier || !password) {
@@ -629,8 +666,10 @@ export function createAuthRoutes(): Router {
    */
   router.get('/me', async (req: Request, res: Response) => {
     try {
+      const cookieToken = req.cookies?.[ACCESS_TOKEN_COOKIE];
       const authHeader = req.headers.authorization;
-      const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      const token = cookieToken || headerToken;
 
       if (!token) {
         return res.status(401).json({

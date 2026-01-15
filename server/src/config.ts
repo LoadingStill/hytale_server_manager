@@ -465,6 +465,7 @@ function buildConfig(): AppConfig {
 
   // Resolve paths
   config = resolvePaths(config);
+  process.env.DATABASE_URL = config.databaseUrl;
 
   // Generate JWT secret if not set
   if (!config.jwtSecret) {

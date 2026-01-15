@@ -46,6 +46,22 @@ export interface AuthResponse {
 }
 
 /**
+ * Initial setup status response
+ */
+export interface SetupStatusResponse {
+  setupRequired: boolean;
+}
+
+/**
+ * Initial admin setup request
+ */
+export interface SetupAdminRequest {
+  email: string;
+  username: string;
+  password: string;
+}
+
+/**
  * Login credentials
  */
 export interface LoginCredentials {
@@ -109,7 +125,7 @@ export class AuthError extends Error {
 }
 
 /**
- * Default admin username (password is randomly generated on first run)
+ * Default admin username (reserved for initial setup guidance)
  */
 export const DEFAULT_ADMIN_USERNAME = 'admin';
 
@@ -122,6 +138,68 @@ export const DEFAULT_ADMIN_USERNAME = 'admin';
 class AuthService {
   private refreshPromise: Promise<AuthResponse> | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Checks whether the initial admin setup is required
+   */
+  async getSetupStatus(): Promise<SetupStatusResponse> {
+    try {
+      const response = await fetch(`${env.api.baseUrl}/api/auth/setup`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: env.api.withCredentials ? 'include' : 'same-origin',
+      });
+
+      if (!response.ok) {
+        throw new AuthError('Failed to load setup status', 'SERVER_ERROR', response.status);
+      }
+
+      return response.json() as Promise<SetupStatusResponse>;
+    } catch (error) {
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
+      logger.error('Setup status error:', error);
+      throw new AuthError('Network error. Please check your connection.', 'NETWORK_ERROR');
+    }
+  }
+
+  /**
+   * Creates the initial admin account
+   */
+  async createInitialAdmin(request: SetupAdminRequest): Promise<{ message: string }> {
+    try {
+      const response = await fetch(`${env.api.baseUrl}/api/auth/setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: env.api.withCredentials ? 'include' : 'same-origin',
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Setup failed' }));
+        throw new AuthError(
+          error.message || 'Setup failed',
+          'SERVER_ERROR',
+          response.status
+        );
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
+      logger.error('Initial admin setup error:', error);
+      throw new AuthError('Network error. Please check your connection.', 'NETWORK_ERROR');
+    }
+  }
 
   /**
    * Authenticates a user with username/email and password

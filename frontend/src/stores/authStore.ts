@@ -26,6 +26,10 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Whether authentication is being initialized */
   isInitializing: boolean;
+  /** Whether initial admin setup is required */
+  setupRequired: boolean | null;
+  /** Whether setup status is loading */
+  isSetupLoading: boolean;
   /** Whether a login request is in progress */
   isLoading: boolean;
   /** Last authentication error */
@@ -90,6 +94,8 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       isAuthenticated: false,
       isInitializing: true,
+      setupRequired: null,
+      isSetupLoading: true,
       isLoading: false,
       error: null,
 
@@ -107,6 +113,8 @@ export const useAuthStore = create<AuthStore>()(
             isAuthenticated: true,
             isLoading: false,
             error: null,
+            setupRequired: false,
+            isSetupLoading: false,
           });
 
           // Fetch user permissions after successful login
@@ -182,9 +190,23 @@ export const useAuthStore = create<AuthStore>()(
        * Initializes authentication state from stored tokens
        */
       initialize: async () => {
-        set({ isInitializing: true });
+        set({ isInitializing: true, isSetupLoading: true });
 
         try {
+          const setupStatus = await authService.getSetupStatus();
+
+          if (setupStatus.setupRequired) {
+            set({
+              user: null,
+              isAuthenticated: false,
+              isInitializing: false,
+              setupRequired: true,
+              isSetupLoading: false,
+            });
+            logger.info('Auth initialized: setup required');
+            return;
+          }
+
           const isValid = await authService.isSessionValid();
 
           if (isValid) {
@@ -193,6 +215,8 @@ export const useAuthStore = create<AuthStore>()(
               user,
               isAuthenticated: !!user,
               isInitializing: false,
+              setupRequired: false,
+              isSetupLoading: false,
             });
 
             // Fetch permissions if user is authenticated
@@ -216,6 +240,8 @@ export const useAuthStore = create<AuthStore>()(
               user: null,
               isAuthenticated: false,
               isInitializing: false,
+              setupRequired: false,
+              isSetupLoading: false,
             });
             logger.debug('Auth initialized: no valid session');
           }
@@ -225,6 +251,8 @@ export const useAuthStore = create<AuthStore>()(
             user: null,
             isAuthenticated: false,
             isInitializing: false,
+            setupRequired: false,
+            isSetupLoading: false,
           });
         }
       },
