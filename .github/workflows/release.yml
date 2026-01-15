@@ -25,6 +25,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Get version
         id: version
         run: |
@@ -40,33 +45,26 @@ jobs:
           echo "Setting version to $VERSION"
 
           # Update server/src/config.ts
-          sed -i "s/export const VERSION = '[^']*'/export const VERSION = '$VERSION'/" server/src/config.ts
+          sed -i "s/export const VERSION = '[^']*'/export const VERSION = '$VERSION'/" packages/server/src/config.ts
 
           # Update server/package.json
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" server/package.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" packages/server/package.json
 
           # Update frontend/package.json
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" frontend/package.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" packages/frontend/package.json
+
+          # Update root package.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
 
           echo "Updated versions:"
-          grep "VERSION = " server/src/config.ts
-          grep '"version"' server/package.json | head -1
+          grep "VERSION = " packages/server/src/config.ts
+          grep '"version"' packages/server/package.json | head -1
 
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
-        run: npm run build
-        working-directory: frontend
-
-      - name: Install server dependencies
-        run: npm ci
-        working-directory: server
-
-      - name: Build server
-        run: npm run build
-        working-directory: server
+      - name: Build all packages
+        run: pnpm build
 
       - name: Create release packages
         run: |
@@ -76,29 +74,28 @@ jobs:
           mkdir -p release-package
 
           # Copy server dist
-          cp -r server/dist release-package/
+          cp -r packages/server/dist release-package/
 
           # Copy frontend dist as public
-          cp -r frontend/dist release-package/public
+          cp -r packages/frontend/dist release-package/public
 
           # Copy Prisma files
           mkdir -p release-package/prisma
-          cp server/prisma/schema.prisma release-package/prisma/
-          cp -r server/prisma/migrations release-package/prisma/
+          cp packages/server/prisma/schema.prisma release-package/prisma/
+          cp -r packages/server/prisma/migrations release-package/prisma/
 
-          # Copy package files
-          cp server/package.json release-package/
-          cp server/package-lock.json release-package/
+          # Copy package files and create production package.json
+          cp packages/server/package.json release-package/
 
           # Copy config template
-          cp server/config.json release-package/
+          cp packages/server/config.json release-package/
 
           # Copy .env.example
-          cp server/.env.example release-package/
+          cp packages/server/.env.example release-package/
 
           # Install production dependencies in release package
           cd release-package
-          npm ci --omit=dev
+          npm install --omit=dev
 
           # Generate Prisma client
           npx prisma generate
