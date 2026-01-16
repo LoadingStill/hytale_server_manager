@@ -1,6 +1,6 @@
 import { ArrowUp, RefreshCw } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { useCheckServerUpdate, useRefreshVersionCheck } from '../../hooks/api/useServerUpdates';
+import { useCheckServerUpdate } from '../../hooks/api/useServerUpdates';
 
 interface ServerUpdateBadgeProps {
   serverId: string;
@@ -11,7 +11,6 @@ interface ServerUpdateBadgeProps {
 
 export const ServerUpdateBadge = ({
   serverId,
-  currentVersion: _currentVersion,
   compact = false,
   onUpdateClick,
 }: ServerUpdateBadgeProps) => {
@@ -19,9 +18,6 @@ export const ServerUpdateBadge = ({
     // Only enable if we have a serverId
     enabled: !!serverId,
   });
-
-  // Available for future use (e.g., manual refresh button)
-  const _refreshCheck = useRefreshVersionCheck();
 
   if (isLoading) {
     return (
