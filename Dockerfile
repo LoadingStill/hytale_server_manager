@@ -29,7 +29,7 @@ RUN pnpm build
 FROM node:20-alpine AS production
 
 # Install runtime dependencies
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl unzip
 
 WORKDIR /app
 
