@@ -69,10 +69,10 @@ export function createTaskGroupRoutes(taskGroupService: TaskGroupService): Route
       });
 
       // Log activity
-      await ActivityLogService.log({
+      const activityLogService: ActivityLogService = req.app.get('activityLogService');
+      activityLogService.logAsync({
         ...getActivityContext(authReq),
         action: ACTIVITY_ACTIONS.TASK_GROUP_CREATE,
-        actionCategory: 'automation',
         resourceType: RESOURCE_TYPES.TASK_GROUP,
         resourceId: group.id,
         resourceName: group.name,
@@ -96,10 +96,10 @@ export function createTaskGroupRoutes(taskGroupService: TaskGroupService): Route
       const group = await taskGroupService.updateGroup(req.params.id, req.body);
 
       // Log activity
-      await ActivityLogService.log({
+      const activityLogService: ActivityLogService = req.app.get('activityLogService');
+      activityLogService.logAsync({
         ...getActivityContext(authReq),
         action: ACTIVITY_ACTIONS.TASK_GROUP_UPDATE,
-        actionCategory: 'automation',
         resourceType: RESOURCE_TYPES.TASK_GROUP,
         resourceId: group.id,
         resourceName: group.name,
@@ -129,10 +129,10 @@ export function createTaskGroupRoutes(taskGroupService: TaskGroupService): Route
       await taskGroupService.deleteGroup(req.params.id);
 
       // Log activity
-      await ActivityLogService.log({
+      const activityLogService: ActivityLogService = req.app.get('activityLogService');
+      activityLogService.logAsync({
         ...getActivityContext(authReq),
         action: ACTIVITY_ACTIONS.TASK_GROUP_DELETE,
-        actionCategory: 'automation',
         resourceType: RESOURCE_TYPES.TASK_GROUP,
         resourceId: req.params.id,
         resourceName: group.name,
@@ -161,10 +161,10 @@ export function createTaskGroupRoutes(taskGroupService: TaskGroupService): Route
       const group = await taskGroupService.toggleGroup(req.params.id, enabled);
 
       // Log activity
-      await ActivityLogService.log({
+      const activityLogService: ActivityLogService = req.app.get('activityLogService');
+      activityLogService.logAsync({
         ...getActivityContext(authReq),
         action: enabled ? ACTIVITY_ACTIONS.TASK_GROUP_ENABLE : ACTIVITY_ACTIONS.TASK_GROUP_DISABLE,
-        actionCategory: 'automation',
         resourceType: RESOURCE_TYPES.TASK_GROUP,
         resourceId: group.id,
         resourceName: group.name,
@@ -193,15 +193,15 @@ export function createTaskGroupRoutes(taskGroupService: TaskGroupService): Route
       const execution = await taskGroupService.executeGroup(req.params.id);
 
       // Log activity
-      await ActivityLogService.log({
+      const activityLogService: ActivityLogService = req.app.get('activityLogService');
+      activityLogService.logAsync({
         ...getActivityContext(authReq),
         action: ACTIVITY_ACTIONS.TASK_GROUP_RUN,
-        actionCategory: 'automation',
         resourceType: RESOURCE_TYPES.TASK_GROUP,
         resourceId: group.id,
         resourceName: group.name,
         status: execution.status === 'failed' ? 'failed' : 'success',
-        details: JSON.stringify({ executionId: execution.id, status: execution.status }),
+        details: { executionId: execution.id, status: execution.status },
       });
 
       return res.json(execution);
