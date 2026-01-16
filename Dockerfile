@@ -29,7 +29,9 @@ RUN pnpm build
 FROM node:20-alpine AS production
 
 # Install runtime dependencies (su-exec for dropping privileges with PUID/PGID)
-RUN apk add --no-cache openssl unzip su-exec shadow
+# Install runtime dependencies and Java 25 (from edge/community for Hytale)
+RUN apk add --no-cache openssl unzip su-exec shadow && \
+    apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community openjdk25-jre
 
 WORKDIR /app
 
